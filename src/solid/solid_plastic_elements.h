@@ -5,6 +5,7 @@
 #include "constitutive/plastic_constitutive_laws.h"
 #include "refineable_solid_elements.h"
 #include "generic/interpolate_from_integral_points.h"
+#include <limits>
 
 namespace oomph
 {
@@ -259,6 +260,12 @@ namespace oomph
       construct_inv_fp_internal_data();
       construct_invBpks_internal_data();
 
+      const unsigned nipt = this->integral_pt()->nweight();
+      for (unsigned ipt = 0; ipt < nipt; ipt++)
+      {
+        Plastic_newton_solve_substeps.push_back(1);
+      }
+
       if (Plastic_model_type >= PlasticModel::SubloadingSurface)
       {
         construct_r_internal_data();
@@ -368,11 +375,77 @@ namespace oomph
       }
     }
 
+    void adaptive_plastic_newton_solve(const unsigned& ipt,
+                                       const DenseMatrix<double>& C)
+    {
+      initialise_solve(ipt);
+      const unsigned n_steps = Plastic_newton_solve_substeps[ipt];
+      const unsigned n_iter_max = 15;
+
+      if (n_steps > 1)
+        oomph_info << " Steps for ipt " << ipt << " are "
+                   << n_steps; // << std::endl;
+
+      unsigned n_iter_taken = 0;
+      if (n_steps == 1)
+      {
+        n_iter_taken = plastic_newton_solve_actual(ipt, C, n_iter_max);
+        oomph_info << " Took " << n_iter_taken << " iterations " << std::endl;
+      }
+      else
+      {
+        // Retreive previous tital deformation
+        DenseMatrix<double> C_total_prev(DIM, DIM, 0.0);
+        compute_total_right_cauchy_green_deformation_tensor(
+          1, ipt, C_total_prev);
+
+        DenseMatrix<double> C_next(DIM, DIM);
+        for (unsigned int s = 0; s < n_steps; s++)
+        {
+          const double frac_C = 1.0 * (s + 1) / n_steps;
+          oomph_info << " frac_C " << frac_C << std::endl;
+
+          // Fill C_next
+          for (unsigned i = 0; i < DIM; i++)
+          {
+            for (unsigned j = 0; j < DIM; j++)
+            {
+              C_next(i, j) =
+                C_total_prev(i, j) * (1 - frac_C) + frac_C * C(i, j);
+            }
+          }
+
+          n_iter_taken = plastic_newton_solve_actual(ipt, C_next, n_iter_max);
+          if (n_iter_taken > n_iter_max)
+          {
+            oomph_info << " Took " << n_iter_taken << " on solve for c_next "
+                       << std::endl;
+            break;
+          }
+        }
+      }
+
+      if (n_iter_taken > n_iter_max)
+      {
+        Plastic_newton_solve_substeps[ipt] = 2 * n_steps;
+        oomph_info << "Increasing number of substeps for ipt " << ipt
+                   << " from " << n_steps / 2 << " to " << n_steps << std::endl;
+        adaptive_plastic_newton_solve(ipt, C);
+      }
+      else if (n_iter_taken <= 5)
+      {
+        Plastic_newton_solve_substeps[ipt] = std::max((unsigned)1, n_steps / 2);
+      }
+      if (n_steps > 1)
+        oomph_info << " Took " << n_iter_taken << " to solve the last step."
+                   << std::endl;
+    }
+
     // =========================================================================
-    /// \short This function solves for the plastic variables of one integration
-    /// point. For that, it first checks, whether there is plastic deformation.
-    /// If there is, it performs an internal newton solve. If there is not, only
-    /// r is updated.
+    /// \short This function solves for the plastic variables of one
+    /// integration point. For that, it first checks, whether there is plastic
+    /// deformation. If there is, it performs an internal newton solve. If
+    /// there is not, only r is updated.
     ///
     /// \param[in] ipt The integration point
     /// \param[out] C The global right Cauchy Green tensor in the undeformed
@@ -388,7 +461,16 @@ namespace oomph
       // updated to fullfill the yield surface equation.
       if (!is_there_plastic_deformation(ipt)) return;
 
+      oomph_info << "there is plastic deformation " << std::endl;
+      adaptive_plastic_newton_solve(ipt, C);
+    }
 
+
+    unsigned plastic_newton_solve_actual(
+      const unsigned& ipt,
+      const DenseMatrix<double>& C,
+      const unsigned& max_iter = std::numeric_limits<unsigned>::max())
+    {
       // For now we just build the linear algebra distribution and the solver
       // each time we solve:
       OomphCommunicator* communicator_pt = new OomphCommunicator();
@@ -413,6 +495,7 @@ namespace oomph
 
       while (maxres > Plastic_Newton_Solver_Tolerance)
       {
+        if (nIter == max_iter) return max_iter + 1;
         // Initialize and compute the jacobian.
         jacobian.initialise(0.0);
         fill_in_jacobian_plastic(residuals, jacobian, ipt, C);
@@ -438,6 +521,8 @@ namespace oomph
       delete lin_alg_dist_pt;
       delete solver_pt;
       delete communicator_pt;
+
+      return nIter;
     }
 
     // =========================================================================
@@ -2069,6 +2154,9 @@ namespace oomph
     /// [Number of ipts, number of types of plastic data, number of variables in
     /// that data type]
     Vector<Vector<Vector<int>>> Plastic_data_eqn_number;
+
+    /// [Number of ipts, number of substeps]
+    Vector<unsigned> Plastic_newton_solve_substeps;
 
     /// [Number of ipts, number of data to be finite differenced]
     //// We store pointers to all the plastic data which are to be finite
