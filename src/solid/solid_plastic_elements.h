@@ -382,15 +382,10 @@ namespace oomph
       const unsigned n_steps = Plastic_newton_solve_substeps[ipt];
       const unsigned n_iter_max = 15;
 
-      if (n_steps > 1)
-        oomph_info << " Steps for ipt " << ipt << " are "
-                   << n_steps; // << std::endl;
-
       unsigned n_iter_taken = 0;
       if (n_steps == 1)
       {
         n_iter_taken = plastic_newton_solve_actual(ipt, C, n_iter_max);
-        oomph_info << " Took " << n_iter_taken << " iterations " << std::endl;
       }
       else
       {
@@ -403,7 +398,6 @@ namespace oomph
         for (unsigned int s = 0; s < n_steps; s++)
         {
           const double frac_C = 1.0 * (s + 1) / n_steps;
-          oomph_info << " frac_C " << frac_C << std::endl;
 
           // Fill C_next
           for (unsigned i = 0; i < DIM; i++)
@@ -418,8 +412,6 @@ namespace oomph
           n_iter_taken = plastic_newton_solve_actual(ipt, C_next, n_iter_max);
           if (n_iter_taken > n_iter_max)
           {
-            oomph_info << " Took " << n_iter_taken << " on solve for c_next "
-                       << std::endl;
             break;
           }
         }
@@ -436,9 +428,6 @@ namespace oomph
       {
         Plastic_newton_solve_substeps[ipt] = std::max((unsigned)1, n_steps / 2);
       }
-      if (n_steps > 1)
-        oomph_info << " Took " << n_iter_taken << " to solve the last step."
-                   << std::endl;
     }
 
     // =========================================================================
@@ -461,7 +450,6 @@ namespace oomph
       // updated to fullfill the yield surface equation.
       if (!is_there_plastic_deformation(ipt)) return;
 
-      oomph_info << "there is plastic deformation " << std::endl;
       adaptive_plastic_newton_solve(ipt, C);
     }
 
