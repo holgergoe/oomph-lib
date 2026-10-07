@@ -64,8 +64,7 @@ namespace oomph
 
     /// Fill in the contribution to the mass matrix and residuals.
     void fill_in_contribution_to_mass_matrix(
-      Vector<double>& residuals,
-      DenseMatrix<double>& mass_matrix) override
+      Vector<double>& residuals, DenseMatrix<double>& mass_matrix) override
     {
       fill_in_generic_contribution_to_residuals_pvd(
         residuals, GeneralisedElement::Dummy_matrix, mass_matrix, 5);

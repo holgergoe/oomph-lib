@@ -35,10 +35,11 @@ namespace oomph
   //====================================================================
   template<unsigned DIM>
   void RefineablePVDEquations<DIM>::
-    fill_in_generic_contribution_to_residuals_pvd(Vector<double>& residuals,
-                                                  DenseMatrix<double>& jacobian,
-                                                  DenseMatrix<double>& mass_matrix,
-                                                  const unsigned& flag)
+    fill_in_generic_contribution_to_residuals_pvd(
+      Vector<double>& residuals,
+      DenseMatrix<double>& jacobian,
+      DenseMatrix<double>& mass_matrix,
+      const unsigned& flag)
   {
 #ifdef PARANOID
     // Check if the constitutive equation requires the explicit imposition of an
@@ -350,12 +351,11 @@ namespace oomph
                   {
                     Node* llocal_node_pt = node_pt(ll);
                     const bool iis_hanging = llocal_node_pt->is_hanging();
-                    nn_master = iis_hanging
-                                  ? llocal_node_pt->hanging_pt()->nmaster()
-                                  : 1;
+                    nn_master =
+                      iis_hanging ? llocal_node_pt->hanging_pt()->nmaster() : 1;
 
-                    DenseMatrix<int> position_local_unk_at_node(
-                      n_position_type, DIM);
+                    DenseMatrix<int> position_local_unk_at_node(n_position_type,
+                                                                DIM);
                     for (unsigned mm = 0; mm < nn_master; mm++)
                     {
                       if (iis_hanging)

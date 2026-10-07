@@ -1059,8 +1059,7 @@ namespace oomph
   {
   public:
     /// Constructor. A zero diffusion coefficient recovers the Newmark scheme.
-    explicit NewmarkWithDiffusion()
-      : Newmark<NSTEPS>()
+    explicit NewmarkWithDiffusion() : Newmark<NSTEPS>()
     {
       this->Type = "NewmarkWithDiffusion";
     }
@@ -1084,8 +1083,7 @@ namespace oomph
       const double newmark_weight = Newmark<NSTEPS>::weight(i, j);
       if (i == 2)
       {
-        return newmark_weight +
-               Dissipation * Newmark<NSTEPS>::weight(1, j);
+        return newmark_weight + Dissipation * Newmark<NSTEPS>::weight(1, j);
       }
       return newmark_weight;
     }

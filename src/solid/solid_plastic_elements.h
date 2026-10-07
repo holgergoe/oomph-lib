@@ -2605,11 +2605,9 @@ namespace oomph
     void fill_in_contribution_to_jacobian(
       Vector<double>& residuals, DenseMatrix<double>& jacobian) override
     {
-      RefineablePVDEquations<
-        DIM>::fill_in_generic_contribution_to_residuals_pvd(residuals,
-                                                            jacobian,
-                                                            GeneralisedElement::Dummy_matrix,
-                                                            1);
+      RefineablePVDEquations<DIM>::
+        fill_in_generic_contribution_to_residuals_pvd(
+          residuals, jacobian, GeneralisedElement::Dummy_matrix, 1);
     }
 
 
