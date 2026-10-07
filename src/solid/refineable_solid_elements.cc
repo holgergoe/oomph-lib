@@ -37,6 +37,7 @@ namespace oomph
   void RefineablePVDEquations<DIM>::
     fill_in_generic_contribution_to_residuals_pvd(Vector<double>& residuals,
                                                   DenseMatrix<double>& jacobian,
+                                                  DenseMatrix<double>& mass_matrix,
                                                   const unsigned& flag)
   {
 #ifdef PARANOID
@@ -130,6 +131,8 @@ namespace oomph
             // work out dx_gen_dt(2,...)
             if ((lambda_sq > 0.0) && (this->Unsteady))
             {
+              // The time-stepper may include velocity-proportional diffusion
+              // in its second-derivative weights.
               accel[i] += dnodal_position_gen_dt(2, l, k, i) * psi_;
             }
 
@@ -198,7 +201,7 @@ namespace oomph
         n_node, n_position_type, DIM, DIM, DIM, 0.0);
 
       // Get Jacobian too?
-      if (flag == 1)
+      if ((flag == 1) || (flag == 3))
       {
         // Derivative of metric tensor w.r.t. to discrete positional dofs
         // NOTE: Since G is symmetric we only compute the upper triangle
@@ -335,9 +338,64 @@ namespace oomph
                 }
                 residuals[local_eqn] += W * sum * hang_weight;
 
+                // Add the mass matrix. This involves another loop over the
+                // nodes because the Jacobian may be evaluated by finite
+                // differences.
+                if (flag > 2)
+                {
+                  unsigned nn_master = 1;
+                  double hhang_weight = 1.0;
+
+                  for (unsigned ll = 0; ll < n_node; ll++)
+                  {
+                    Node* llocal_node_pt = node_pt(ll);
+                    const bool iis_hanging = llocal_node_pt->is_hanging();
+                    nn_master = iis_hanging
+                                  ? llocal_node_pt->hanging_pt()->nmaster()
+                                  : 1;
+
+                    DenseMatrix<int> position_local_unk_at_node(
+                      n_position_type, DIM);
+                    for (unsigned mm = 0; mm < nn_master; mm++)
+                    {
+                      if (iis_hanging)
+                      {
+                        position_local_unk_at_node = local_position_hang_eqn(
+                          llocal_node_pt->hanging_pt()->master_node_pt(mm));
+                        hhang_weight =
+                          llocal_node_pt->hanging_pt()->master_weight(mm);
+                      }
+                      else
+                      {
+                        for (unsigned kk = 0; kk < n_position_type; kk++)
+                        {
+                          for (unsigned ii = 0; ii < DIM; ii++)
+                          {
+                            position_local_unk_at_node(kk, ii) =
+                              position_local_eqn(ll, kk, ii);
+                          }
+                        }
+                        hhang_weight = 1.0;
+                      }
+
+                      for (unsigned kk = 0; kk < n_position_type; kk++)
+                      {
+                        const int local_unknown =
+                          position_local_unk_at_node(kk, i);
+                        if (local_unknown >= 0)
+                        {
+                          mass_matrix(local_eqn, local_unknown) +=
+                            lambda_sq * psi(l, k) * psi(ll, kk) * W *
+                            hang_weight * hhang_weight;
+                        }
+                      }
+                    }
+                  }
+                }
+
 
                 // Get Jacobian too?
-                if (flag == 1)
+                if ((flag == 1) || (flag == 3))
                 {
                   // Offset for faster access in general stress loop
                   const unsigned offset1 = d_G_dX.offset(l, k, i);
@@ -526,7 +584,6 @@ namespace oomph
       } // End of loop over nodes
     } // End of loop over integration points
   }
-
 
   //=======================================================================
   /// Compute the diagonal of the velocity mass matrix for LSC

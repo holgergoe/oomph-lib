@@ -2234,7 +2234,10 @@ namespace oomph
       PlasticEquationsBase<DIM>::plastic_newton_solve();
 
       PVDEquations<DIM>::fill_in_generic_contribution_to_residuals_pvd(
-        residuals, GeneralisedElement::Dummy_matrix, 0);
+        residuals,
+        GeneralisedElement::Dummy_matrix,
+        GeneralisedElement::Dummy_matrix,
+        0);
     }
 
     /// Fill in contribution to Jacobian (either by FD or analytically,
@@ -2243,7 +2246,7 @@ namespace oomph
       Vector<double>& residuals, DenseMatrix<double>& jacobian) override
     {
       PVDEquations<DIM>::fill_in_generic_contribution_to_residuals_pvd(
-        residuals, jacobian, 1);
+        residuals, jacobian, GeneralisedElement::Dummy_matrix, 1);
     }
 
     /// Output function
@@ -2589,7 +2592,10 @@ namespace oomph
 
       RefineablePVDEquations<DIM>::
         fill_in_generic_contribution_to_residuals_pvd(
-          residuals, GeneralisedElement::Dummy_matrix, 0);
+          residuals,
+          GeneralisedElement::Dummy_matrix,
+          GeneralisedElement::Dummy_matrix,
+          0);
     }
 
 
@@ -2602,6 +2608,7 @@ namespace oomph
       RefineablePVDEquations<
         DIM>::fill_in_generic_contribution_to_residuals_pvd(residuals,
                                                             jacobian,
+                                                            GeneralisedElement::Dummy_matrix,
                                                             1);
     }
 

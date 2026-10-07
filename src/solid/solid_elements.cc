@@ -166,6 +166,7 @@ namespace oomph
   void PVDEquations<DIM>::fill_in_generic_contribution_to_residuals_pvd(
     Vector<double>& residuals,
     DenseMatrix<double>& jacobian,
+    DenseMatrix<double>& mass_matrix,
     const unsigned& flag)
   {
 #ifdef PARANOID
@@ -268,6 +269,8 @@ namespace oomph
             // Only compute accelerations if inertia is switched on
             if ((lambda_sq > 0.0) && (this->Unsteady))
             {
+              // The time-stepper may include velocity-proportional diffusion
+              // in its second-derivative weights.
               accel[i] += this->dnodal_position_gen_dt(2, l, k, i) * psi_;
             }
 
@@ -346,7 +349,7 @@ namespace oomph
         n_node, n_position_type, DIM, DIM, DIM, 0.0);
 
       // Get Jacobian too?
-      if (flag == 1)
+      if ((flag == 1) || (flag == 3))
       {
         // Derivative of metric tensor w.r.t. to discrete positional dofs
         // NOTE: Since G is symmetric we only compute the upper triangle
@@ -418,8 +421,26 @@ namespace oomph
               }
               residuals[local_eqn] += W * sum;
 
+              // Add the displacement mass matrix.
+              if (flag > 2)
+              {
+                for (unsigned ll = 0; ll < n_node; ll++)
+                {
+                  for (unsigned kk = 0; kk < n_position_type; kk++)
+                  {
+                    const int local_unknown =
+                      this->position_local_eqn(ll, kk, i);
+                    if (local_unknown >= 0)
+                    {
+                      mass_matrix(local_eqn, local_unknown) +=
+                        lambda_sq * psi(l, k) * psi(ll, kk) * W;
+                    }
+                  }
+                }
+              }
+
               // Get Jacobian too?
-              if (flag == 1)
+              if ((flag == 1) || (flag == 3))
               {
                 // Offset for faster access in general stress loop
                 const unsigned offset1 = d_G_dX.offset(l, k, i);
@@ -1248,6 +1269,7 @@ namespace oomph
   /// flag=3: compute residuals, jacobian (full analytic) and mass matrix
   /// flag=4: compute residuals, jacobian (FD for derivatives w.r.t.
   ///          displacements) and mass matrix
+  /// flag=5: compute residuals and mass matrix only
   //=======================================================================
   template<unsigned DIM>
   void PVDEquationsWithPressure<DIM>::
@@ -1733,7 +1755,7 @@ namespace oomph
               }
 
               // Derivatives w.r.t. pressure dofs
-              if (flag > 0)
+              if ((flag > 0) && (flag < 5))
               {
                 // Loop over the pressure dofs for unknowns
                 for (unsigned l2 = 0; l2 < n_solid_pres; l2++)
@@ -1882,7 +1904,7 @@ namespace oomph
             }
 
             // Derivatives w.r.t. pressure dofs
-            if (flag > 0)
+            if ((flag > 0) && (flag < 5))
             {
               // Loop over the pressure nodes again
               for (unsigned l2 = 0; l2 < n_solid_pres; l2++)

@@ -1050,6 +1050,52 @@ namespace oomph
   };
 
 
+  //====================================================================
+  /// Newmark scheme whose second derivative includes a multiple of the
+  /// first derivative. The diffusion coefficient has units of inverse time.
+  //====================================================================
+  template<unsigned NSTEPS>
+  class NewmarkWithDiffusion : public Newmark<NSTEPS>
+  {
+  public:
+    /// Constructor. A zero diffusion coefficient recovers the Newmark scheme.
+    explicit NewmarkWithDiffusion()
+      : Newmark<NSTEPS>()
+    {
+      this->Type = "NewmarkWithDiffusion";
+    }
+
+    /// Access the diffusion coefficient.
+    double& dissipation()
+    {
+      return Dissipation;
+    }
+
+    /// Access the diffusion coefficient.
+    const double& dissipation() const
+    {
+      return Dissipation;
+    }
+
+    /// Return the Newmark weight, including diffusion for the second
+    /// derivative.
+    double weight(const unsigned& i, const unsigned& j) const override
+    {
+      const double newmark_weight = Newmark<NSTEPS>::weight(i, j);
+      if (i == 2)
+      {
+        return newmark_weight +
+               Dissipation * Newmark<NSTEPS>::weight(1, j);
+      }
+      return newmark_weight;
+    }
+
+  private:
+    /// Coefficient multiplying the first derivative in the second derivative.
+    double Dissipation = 0.0;
+  };
+
+
   /////////////////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////////////

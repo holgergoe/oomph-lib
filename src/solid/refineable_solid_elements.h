@@ -59,7 +59,44 @@ namespace oomph
     void fill_in_generic_contribution_to_residuals_pvd(
       Vector<double>& residuals,
       DenseMatrix<double>& jacobian,
+      DenseMatrix<double>& mass_matrix,
       const unsigned& flag);
+
+    /// Fill in the contribution to the mass matrix and residuals.
+    void fill_in_contribution_to_mass_matrix(
+      Vector<double>& residuals,
+      DenseMatrix<double>& mass_matrix) override
+    {
+      fill_in_generic_contribution_to_residuals_pvd(
+        residuals, GeneralisedElement::Dummy_matrix, mass_matrix, 5);
+    }
+
+    /// Fill in the contribution to the Jacobian, mass matrix and residuals.
+    void fill_in_contribution_to_jacobian_and_mass_matrix(
+      Vector<double>& residuals,
+      DenseMatrix<double>& jacobian,
+      DenseMatrix<double>& mass_matrix) override
+    {
+      if (this->Solve_for_consistent_newmark_accel_flag ||
+          (this->Solid_ic_pt != 0))
+      {
+        this->fill_in_contribution_to_jacobian(residuals, jacobian);
+        Vector<double> dummy_residuals(this->ndof(), 0.0);
+        fill_in_generic_contribution_to_residuals_pvd(
+          dummy_residuals, GeneralisedElement::Dummy_matrix, mass_matrix, 5);
+      }
+      else if (this->Evaluate_jacobian_by_fd)
+      {
+        fill_in_generic_contribution_to_residuals_pvd(
+          residuals, GeneralisedElement::Dummy_matrix, mass_matrix, 4);
+        this->fill_in_jacobian_from_solid_position_by_fd(residuals, jacobian);
+      }
+      else
+      {
+        fill_in_generic_contribution_to_residuals_pvd(
+          residuals, jacobian, mass_matrix, 3);
+      }
+    }
 
     /// No values are interpolated in this element (pure solid)
     void get_interpolated_values(const unsigned& t,

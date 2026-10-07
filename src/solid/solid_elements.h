@@ -457,7 +457,10 @@ namespace oomph
     void fill_in_contribution_to_residuals(Vector<double>& residuals)
     {
       fill_in_generic_contribution_to_residuals_pvd(
-        residuals, GeneralisedElement::Dummy_matrix, 0);
+        residuals,
+        GeneralisedElement::Dummy_matrix,
+        GeneralisedElement::Dummy_matrix,
+        0);
     }
 
     /// Fill in contribution to Jacobian (either by FD or analytically,
@@ -495,7 +498,10 @@ namespace oomph
       {
         // Add the contribution to the residuals from this element
         this->fill_in_generic_contribution_to_residuals_pvd(
-          residuals, GeneralisedElement::Dummy_matrix, 0);
+          residuals,
+          GeneralisedElement::Dummy_matrix,
+          GeneralisedElement::Dummy_matrix,
+          0);
 
         // Get the solid entries in the jacobian using finite differences
         this->fill_in_jacobian_from_solid_position_by_fd(jacobian);
@@ -503,7 +509,43 @@ namespace oomph
       // Do it analytically
       else
       {
-        fill_in_generic_contribution_to_residuals_pvd(residuals, jacobian, 1);
+        fill_in_generic_contribution_to_residuals_pvd(
+          residuals, jacobian, GeneralisedElement::Dummy_matrix, 1);
+      }
+    }
+
+    /// Fill in the contribution to the mass matrix and residuals.
+    void fill_in_contribution_to_mass_matrix(Vector<double>& residuals,
+                                             DenseMatrix<double>& mass_matrix)
+    {
+      fill_in_generic_contribution_to_residuals_pvd(
+        residuals, GeneralisedElement::Dummy_matrix, mass_matrix, 5);
+    }
+
+    /// Fill in the contribution to the Jacobian, mass matrix and residuals.
+    void fill_in_contribution_to_jacobian_and_mass_matrix(
+      Vector<double>& residuals,
+      DenseMatrix<double>& jacobian,
+      DenseMatrix<double>& mass_matrix)
+    {
+      if (this->Solve_for_consistent_newmark_accel_flag ||
+          (this->Solid_ic_pt != 0))
+      {
+        this->fill_in_contribution_to_jacobian(residuals, jacobian);
+        Vector<double> dummy_residuals(this->ndof(), 0.0);
+        fill_in_generic_contribution_to_residuals_pvd(
+          dummy_residuals, GeneralisedElement::Dummy_matrix, mass_matrix, 5);
+      }
+      else if (this->Evaluate_jacobian_by_fd)
+      {
+        fill_in_generic_contribution_to_residuals_pvd(
+          residuals, GeneralisedElement::Dummy_matrix, mass_matrix, 4);
+        this->fill_in_jacobian_from_solid_position_by_fd(jacobian);
+      }
+      else
+      {
+        fill_in_generic_contribution_to_residuals_pvd(
+          residuals, jacobian, mass_matrix, 3);
       }
     }
 
@@ -536,11 +578,17 @@ namespace oomph
 
 
   protected:
-    /// Compute element residual Vector only (if flag=and/or element
-    /// Jacobian matrix
+    /// Compute element residuals and, depending on the flag, the Jacobian
+    /// and/or mass matrix.
+    /// - flag=0: residuals only
+    /// - flag=1: residuals and analytical Jacobian
+    /// - flag=3: residuals, analytical Jacobian, and mass matrix
+    /// - flag=4: residuals and mass matrix (Jacobian by finite differences)
+    /// - flag=5: residuals and mass matrix only
     virtual void fill_in_generic_contribution_to_residuals_pvd(
       Vector<double>& residuals,
       DenseMatrix<double>& jacobian,
+      DenseMatrix<double>& mass_matrix,
       const unsigned& flag);
 
     /// Return the 2nd Piola Kirchhoff stress tensor, as
@@ -965,6 +1013,34 @@ namespace oomph
         // and fully analytical Jacobian
         fill_in_generic_residual_contribution_pvd_with_pressure(
           residuals, jacobian, GeneralisedElement::Dummy_matrix, 1);
+      }
+    }
+
+    /// Fill in the contribution to the mass matrix and residuals.
+    void fill_in_contribution_to_mass_matrix(Vector<double>& residuals,
+                                             DenseMatrix<double>& mass_matrix)
+    {
+      // Solve for the consistent acceleration in the Newmark scheme
+      // Note that this replaces solid entries only
+      if ((this->Solve_for_consistent_newmark_accel_flag) ||
+          (this->Solid_ic_pt != 0))
+      {
+        std::string error_message = "Can't assign consistent Newmark history\n";
+        error_message += " values for solid element with pressure dofs\n";
+
+        throw OomphLibError(
+          error_message, OOMPH_CURRENT_FUNCTION, OOMPH_EXCEPTION_LOCATION);
+      }
+
+      // Flag 5 computes the residuals and mass matrix without a Jacobian.
+      fill_in_generic_residual_contribution_pvd_with_pressure(
+        residuals, GeneralisedElement::Dummy_matrix, mass_matrix, 5);
+
+      // Use the same sign convention as the Jacobian-and-mass-matrix routine.
+      const unsigned n_dof = this->ndof();
+      for (unsigned i = 0; i < n_dof; i++)
+      {
+        residuals[i] *= -1.0;
       }
     }
 
